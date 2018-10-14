@@ -156,6 +156,7 @@
 			{{range .}}
 				{{comment_html .Doc}}
 				<pre>{{node_html $ .Decl true}}</pre>
+				{{buildtagsSlice_html $ .Names}}
 			{{end}}
 		{{end}}
 		{{with .Vars}}
@@ -163,6 +164,7 @@
 			{{range .}}
 				{{comment_html .Doc}}
 				<pre>{{node_html $ .Decl true}}</pre>
+				{{buildtagsSlice_html $ .Names}}
 			{{end}}
 		{{end}}
 		{{range .Funcs}}
@@ -177,6 +179,7 @@
 			{{comment_html .Doc}}
 			{{example_html $ .Name}}
 			{{callgraph_html $ "" .Name}}
+			{{buildtags_html $ "" .Name}}
 
 		{{end}}
 		{{range .Types}}
@@ -193,16 +196,19 @@
 			{{range .Consts}}
 				{{comment_html .Doc}}
 				<pre>{{node_html $ .Decl true}}</pre>
+				{{buildtagsSlice_html $ .Names}}
 			{{end}}
 
 			{{range .Vars}}
 				{{comment_html .Doc}}
 				<pre>{{node_html $ .Decl true}}</pre>
+				{{buildtagsSlice_html $ .Names}}
 			{{end}}
 
 			{{example_html $ $tname}}
 			{{implements_html $ $tname}}
 			{{methodset_html $ $tname}}
+			{{buildtags_html $ "" $tname}}
 
 			{{range .Funcs}}
 				{{$name_html := html .Name}}
@@ -215,6 +221,7 @@
 				{{comment_html .Doc}}
 				{{example_html $ .Name}}
 				{{callgraph_html $ "" .Name}}
+				{{buildtags_html $ "" .Name}}
 			{{end}}
 
 			{{range .Methods}}
@@ -229,6 +236,7 @@
 				{{$name := printf "%s_%s" $tname .Name}}
 				{{example_html $ $name}}
 				{{callgraph_html $ .Recv .Name}}
+				{{buildtags_html $ .Recv .Name}}
 			{{end}}
 		{{end}}
 	{{end}}

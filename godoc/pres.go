@@ -10,6 +10,7 @@ import (
 	"sync"
 	"text/template"
 
+	"golang.org/x/tools/go/buildutil"
 	"golang.org/x/tools/godoc/vfs/httpfs"
 )
 
@@ -138,6 +139,18 @@ func NewPresentation(c *Corpus) *Presentation {
 	p.mux.HandleFunc("/search", p.HandleSearch)
 	p.mux.HandleFunc("/opensearch.xml", p.serveSearchDesc)
 	return p
+}
+
+// ApplyBuildTags enables Go files with these listed build tags for additional
+// parsing.
+func (p *Presentation) ApplyBuildTags(tags string) error {
+	var tf buildutil.TagsFlag
+	if err := tf.Set(tags); err != nil {
+		return err
+	}
+	p.cmdHandler.buildTags = tf
+	p.pkgHandler.buildTags = tf
+	return nil
 }
 
 func (p *Presentation) FileServer() http.Handler {

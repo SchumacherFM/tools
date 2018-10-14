@@ -63,6 +63,8 @@ var (
 	// layout control
 	urlFlag = flag.String("url", "", "print HTML for named URL")
 
+	buildTagsFlag = flag.String("tags", "", "include identifiers with defined build tags")
+
 	verbose = flag.Bool("v", false, "verbose mode")
 
 	// file system roots
@@ -248,6 +250,9 @@ func main() {
 	pres.DeclLinks = *declLinks
 	if *notesRx != "" {
 		pres.NotesRx = regexp.MustCompile(*notesRx)
+	}
+	if err := pres.ApplyBuildTags(*buildTagsFlag); err != nil {
+		log.Fatal(err)
 	}
 
 	readTemplates(pres)

@@ -41,6 +41,7 @@ type handlerServer struct {
 	stripPrefix string   // prefix to strip from import path; e.g. "pkg/"
 	fsRoot      string   // file system root to which the pattern is mapped; e.g. "/src"
 	exclude     []string // file system paths to exclude; e.g. "/src/cmd"
+	buildTags   []string
 }
 
 func (s *handlerServer) registerWithMux(mux *http.ServeMux) {
@@ -87,6 +88,7 @@ func (h *handlerServer) GetPageInfo(abspath, relpath string, mode PageInfoMode, 
 		}
 		return ioutil.NopCloser(bytes.NewReader(data)), nil
 	}
+	ctxt.BuildTags = h.buildTags
 
 	// Make the syscall/js package always visible by default.
 	// It defaults to the host's GOOS/GOARCH, and golang.org's
@@ -147,6 +149,9 @@ func (h *handlerServer) GetPageInfo(abspath, relpath string, mode PageInfoMode, 
 			if mode&AllMethods != 0 {
 				m |= doc.AllMethods
 			}
+
+			info.IdentifierBuildTags, _ = h.c.mapIdentifierToBuildTag(files, relpath, abspath, &ctxt)
+
 			info.PDoc = doc.New(pkg, pathpkg.Clean(relpath), m) // no trailing '/' in importpath
 			if mode&NoTypeAssoc != 0 {
 				for _, t := range info.PDoc.Types {

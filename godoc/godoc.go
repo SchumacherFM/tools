@@ -98,6 +98,10 @@ func (p *Presentation) initFuncMap() {
 		"implements_html": p.implements_htmlFunc,
 		"methodset_html":  p.methodset_htmlFunc,
 
+		// formating of build tags
+		"buildtags_html":      buildTags_htmlFunc,
+		"buildtagsSlice_html": buildTagsSlice_htmlFunc,
+
 		// formatting of Notes
 		"noteTitle": noteTitle,
 
@@ -443,6 +447,10 @@ type PageInfo struct {
 	Dirs    *DirList  // nil if no directory information
 	DirTime time.Time // directory time stamp
 	DirFlat bool      // if set, show directory in a flat (non-indented) manner
+
+	// IdentifierBuildTags contain as key the type/var/const/func/method
+	// (identifier) name and as value the build tags as comma separated list.
+	IdentifierBuildTags map[string]string
 }
 
 func (info *PageInfo) IsEmpty() bool {
@@ -579,6 +587,60 @@ func queryLinkFunc(s, query string, line int) string {
 
 func docLinkFunc(s string, ident string) string {
 	return pathpkg.Clean("/pkg/"+s) + "/#" + ident
+}
+
+func buildTags_htmlFunc(info *PageInfo, rec, name string) string {
+	key := name
+	if rec != "" {
+		key = rec + "." + name
+	}
+	tg, ok := info.IdentifierBuildTags[key]
+	if !ok {
+		return ""
+	}
+
+	var buf strings.Builder
+	buf.WriteString("<p>")
+	buf.WriteString("Build tag")
+	if strings.ContainsRune(tg, ',') { // see func mapIdentifierToBuildTag for separator ,
+		buf.WriteString("s")
+	}
+	buf.WriteString(": ")
+	buf.WriteString(tg)
+	buf.WriteString("</p>")
+	return buf.String()
+}
+
+func buildTagsSlice_htmlFunc(info *PageInfo, names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	var buf strings.Builder
+	buf.WriteString("<p>")
+	buf.WriteString("Build tag")
+	if len(names) > 1 {
+		buf.WriteString("s")
+	}
+	buf.WriteString(": ")
+
+	var i int
+	for _, name := range names {
+		if tg, ok := info.IdentifierBuildTags[name]; ok {
+			if i > 0 {
+				buf.WriteString(", ")
+			}
+			buf.WriteString(name)
+			buf.WriteString(" (")
+			buf.WriteString(tg)
+			buf.WriteString(")")
+			i++
+		}
+	}
+	if i == 0 {
+		return ""
+	}
+	buf.WriteString("</p>")
+	return buf.String()
 }
 
 func (p *Presentation) example_htmlFunc(info *PageInfo, funcName string) string {

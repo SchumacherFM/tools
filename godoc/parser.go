@@ -9,11 +9,17 @@ package godoc
 
 import (
 	"bytes"
+	"fmt"
 	"go/ast"
+	"go/build"
+	"go/format"
 	"go/parser"
 	"go/token"
 	pathpkg "path"
+	"path/filepath"
+	"strings"
 
+	"golang.org/x/tools/go/buildutil"
 	"golang.org/x/tools/godoc/vfs"
 )
 
@@ -44,6 +50,124 @@ func replaceLinePrefixCommentsWithBlankLine(src []byte) {
 		// i <= len(src)
 		src = src[i:]
 	}
+}
+
+func findBuildTags(file *ast.File, allowedBuildTags []string) ([]string, bool) {
+	var tags []string
+	for _, c := range file.Comments {
+		for _, l := range c.List {
+			if !strings.Contains(l.Text, "+build") {
+				continue
+			}
+			var tf buildutil.TagsFlag
+			_ = tf.Set(l.Text)
+			for _, t := range tf {
+				for _, abt := range allowedBuildTags {
+					if t == abt {
+						tags = append(tags, t)
+					}
+				}
+			}
+		}
+	}
+	return tags, len(tags) > 0
+}
+
+// mapIdentifierToBuildTag maps the identifier (type/var/const/func/method) to
+// the build tag. E.g. various method receivers can be scattered over different
+// files with different build tags. The return value map[string]string contains
+// as key the identifier name and the value are the build tags as comma
+// separated list.
+func (c *Corpus) mapIdentifierToBuildTag(files map[string]*ast.File, relpath, abspath string, ctxt *build.Context) (map[string]string, error) {
+	allowedBuildTags := ctxt.BuildTags
+	// key=build tag, value=list of file names
+	tagToFiles := map[string][]string{}
+
+	for fName, fAst := range files {
+		if bts, ok := findBuildTags(fAst, allowedBuildTags); ok {
+			for _, bt := range bts {
+				f := tagToFiles[bt]
+
+				f = append(f, filepath.Base(fName))
+				tagToFiles[bt] = f
+			}
+		}
+	}
+
+	typesWithTags := map[string]string{}
+	if len(tagToFiles) == 0 {
+		return typesWithTags, nil
+	}
+
+	appendName := func(typeName, receiverType, tagName string) {
+		var buf strings.Builder
+		if receiverType != "" {
+			buf.WriteString(receiverType)
+			buf.WriteByte('.')
+		}
+		buf.WriteString(typeName)
+		key := buf.String()
+
+		tns := typesWithTags[key]
+		if tns == "" {
+			tns = tagName
+		} else {
+			tns = tns + ", " + tagName
+		}
+		typesWithTags[key] = tns
+	}
+
+	for tagName, fileNames := range tagToFiles {
+
+		fset := token.NewFileSet()
+		// Not possible to use go/doc.New because we're reading build tag files
+		// only. Those files might reference to other types from other
+		// non-build-tagged & not-parsed files. go/doc ignores those
+		// functions/types. With parseFiles and the following code we can get
+		// all identifiers from the files with a dedicated build tag.
+		astMap, err := c.parseFiles(fset, relpath, abspath, fileNames)
+		if err != nil {
+			return nil, fmt.Errorf("%s in %q with files: %v", err.Error(), abspath, fileNames)
+		}
+
+		for _, fileAst := range astMap {
+			for _, decl := range fileAst.Decls {
+				switch decl := decl.(type) {
+				case *ast.FuncDecl:
+					receiverType := getReceiverType(fset, decl)
+					appendName(decl.Name.String(), receiverType, tagName)
+
+				case *ast.GenDecl:
+					for _, spec := range decl.Specs {
+						switch spec := spec.(type) {
+						case *ast.TypeSpec:
+							appendName(spec.Name.String(), "", tagName)
+
+						case *ast.ValueSpec:
+							for _, id := range spec.Names {
+								appendName(id.Name, "", tagName)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return typesWithTags, nil
+}
+
+func getReceiverType(fset *token.FileSet, decl *ast.FuncDecl) string {
+	if decl.Recv == nil {
+		return ""
+	}
+
+	var buf strings.Builder
+	if err := format.Node(&buf, fset, decl.Recv.List[0].Type); err != nil {
+		return ""
+	}
+
+	return buf.String()
 }
 
 func (c *Corpus) parseFile(fset *token.FileSet, filename string, mode parser.Mode) (*ast.File, error) {

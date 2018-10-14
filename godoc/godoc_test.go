@@ -368,3 +368,63 @@ func TestFilterOutBuildAnnotations(t *testing.T) {
 		t.Errorf("filterOutBuildAnnotations should not remove non-build tag comment")
 	}
 }
+
+func TestBuildTagsPrinter(t *testing.T) {
+
+	info := &PageInfo{
+		IdentifierBuildTags: map[string]string{
+			"MyPrinter.Single": "aBuildTag",
+			"MyPrinter.String": "aBuildTag, anotherBuildTag",
+			"String":           "aBuildTag, anotherBuildTag, anotherBuildTag2, anotherBuildTag3, anotherBuildTag4, anotherBuildTag5, anotherBuildTag6",
+		},
+	}
+
+	t.Run("HTML plural", func(t *testing.T) {
+		const want = `<p>Build tags: aBuildTag, anotherBuildTag</p>`
+		have := buildTags_htmlFunc(info, "MyPrinter", "String")
+		if have != want {
+			t.Errorf("Have: %s\nWant: %s", have, want)
+		}
+	})
+	t.Run("HTML singular", func(t *testing.T) {
+		const want = `<p>Build tag: aBuildTag</p>`
+		have := buildTags_htmlFunc(info, "MyPrinter", "Single")
+		if have != want {
+			t.Errorf("Have: %s\nWant: %s", have, want)
+		}
+	})
+}
+
+func TestBuildTagsSlicePrinter(t *testing.T) {
+	info := &PageInfo{
+		IdentifierBuildTags: map[string]string{
+			"VarString":  "aBuildTag1",
+			"VarString1": "aBuildTag2",
+			"VarString2": "anotherBuildTag",
+			"String":     "aBuildTag, anotherBuildTag, anotherBuildTag2, anotherBuildTag3, anotherBuildTag4, anotherBuildTag5, anotherBuildTag6",
+		},
+	}
+
+	t.Run("empty", func(t *testing.T) {
+		const want = ""
+		have := buildTagsSlice_htmlFunc(info, nil)
+		if have != want {
+			t.Errorf("Have: %q\nWant: %q", have, want)
+		}
+	})
+
+	t.Run("HTML singluar", func(t *testing.T) {
+		const want = "<p>Build tag: VarString (aBuildTag1)</p>"
+		have := buildTagsSlice_htmlFunc(info, []string{"VarString"})
+		if have != want {
+			t.Errorf("Have: %q\nWant: %q", have, want)
+		}
+	})
+	t.Run("HTML plural", func(t *testing.T) {
+		const want = "<p>Build tags: VarString (aBuildTag1), VarString1 (aBuildTag2)</p>"
+		have := buildTagsSlice_htmlFunc(info, []string{"VarString", "VarString1"})
+		if have != want {
+			t.Errorf("Have: %q\nWant: %q", have, want)
+		}
+	})
+}
